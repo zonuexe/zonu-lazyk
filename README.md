@@ -45,9 +45,11 @@ Verified by:
 - Unit tests for every reducer and peephole rule, notation equivalence, and GC
   under pressure.
 
-`cargo bench` has criterion throughput benchmarks. church2int extraction is
-O(1) per numeral; `cat` runs at ~18 MiB/s. Programs bound by their own reduction
-(e.g. `rot13`, `reverse`) are the next optimization target.
+`cargo bench` has criterion throughput benchmarks. Heap cells are packed to 8
+bytes and church2int extraction is O(1) per numeral; on 20 KB inputs the
+interpreter runs on par with the reference (`rot13` matches it, `reverse` is
+within ~1.1x). See [ADR-0005](docs/adr/0005-performance-findings.md) for the
+profiling and roadmap.
 
 ## License
 
