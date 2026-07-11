@@ -38,7 +38,9 @@ fn bench(c: &mut Criterion) {
     let opt = zonu_lazyk::compile::optimize(raw.clone());
     let small = &data[..256];
     let mut opt_group = c.benchmark_group("peephole/reverse-256B");
-    opt_group.bench_function("unoptimized", |b| b.iter(|| run_term(&raw, black_box(small))));
+    opt_group.bench_function("unoptimized", |b| {
+        b.iter(|| run_term(&raw, black_box(small)))
+    });
     opt_group.bench_function("optimized", |b| b.iter(|| run_term(&opt, black_box(small))));
     opt_group.finish();
 

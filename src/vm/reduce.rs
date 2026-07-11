@@ -20,6 +20,17 @@ impl Vm {
         }
     }
 
+    /// Follow any `Ind` chain from `r` and return the cell it resolves to.
+    #[inline]
+    fn resolve(&self, mut r: Ref) -> Cell {
+        loop {
+            match self.heap.get(r) {
+                Cell::Ind(t) => r = t,
+                cell => return cell,
+            }
+        }
+    }
+
     /// Reduce the cell reachable from `root` to weak head normal form and return
     /// a reference to the resulting (non-`Ind`) cell.
     pub fn whnf(&mut self, root: Ref) -> Ref {
@@ -54,9 +65,19 @@ impl Vm {
                     let f = self.arg(self.spine[sl - 1]);
                     let x = self.arg(self.spine[sl - 2]);
                     let redex = self.spine[sl - 2];
-                    if nv == 0 {
-                        self.heap.set(redex, Cell::Ind(x));
+                    // Fast path: `Num(n) Inc Acc(k) = Acc(k+n)`, the church2int
+                    // extraction. Collapses O(n) counting into one step. Inc/Acc
+                    // never appear in user terms, so this only fires at the I/O
+                    // boundary.
+                    if matches!(self.resolve(f), Cell::Comb(Comb::Inc))
+                        && let Cell::Acc(k) = self.resolve(x)
+                    {
+                        let acc = self.alloc(Cell::Acc(k + nv));
+                        self.heap.set(redex, Cell::Ind(acc));
+                    } else if nv == 0 {
+                        self.heap.set(redex, Cell::Ind(x)); // 0 f x = x
                     } else {
+                        // n f x = f ((n-1) f x)
                         let pred = self.alloc(Cell::Num(nv - 1));
                         let pf = self.app(pred, f);
                         let pfx = self.app(pf, x);
@@ -74,11 +95,8 @@ impl Vm {
                         return node; // a bare accumulator is the final value.
                     }
                     let redex = self.spine[self.spine.len() - 1];
-                    let mut arg = self.arg(redex);
-                    while let Cell::Ind(t) = self.heap.get(arg) {
-                        arg = t;
-                    }
-                    if matches!(self.heap.get(arg), Cell::Comb(Comb::Inc)) {
+                    let arg = self.arg(redex);
+                    if matches!(self.resolve(arg), Cell::Comb(Comb::Inc)) {
                         let next = self.alloc(Cell::Acc(k + 1));
                         self.heap.set(redex, Cell::Ind(next));
                         self.spine.pop();
