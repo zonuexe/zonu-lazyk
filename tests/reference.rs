@@ -97,6 +97,41 @@ fn every_combinator_rule_via_identity_witness() {
     }
 }
 
+/// Run a directly-constructed term with an aggressive GC threshold.
+fn run_term_gc(term: &Term, input: &[u8], threshold: usize) -> Vec<u8> {
+    let mut vm = Vm::load(term);
+    vm.set_gc_threshold(threshold);
+    let mut out = Vec::new();
+    vm.run(Cursor::new(input.to_vec()), &mut out)
+        .expect("program ran");
+    out
+}
+
+/// With the heap collected on almost every step, results must be unchanged —
+/// this catches root/relocation bugs in the copying collector.
+#[test]
+fn gc_under_pressure_is_transparent() {
+    use Comb::*;
+    let witnesses = [
+        c(I),
+        ap(ap(c(S), c(K)), c(K)),            // S K K
+        ap(ap(c(C), c(K)), c(I)),            // C K I
+        ap(ap(ap(c(Sp), c(K)), c(I)), c(I)), // S' K I I
+        ap(ap(ap(c(Bp), c(I)), c(I)), c(I)), // B' I I I
+    ];
+    let input = b"collect me!\x00\x7f\xff";
+    for w in &witnesses {
+        assert_eq!(run_term_gc(w, input, 64), input);
+    }
+}
+
+/// A long `cat` run reclaims the heap repeatedly and still echoes exactly.
+#[test]
+fn gc_cat_large_input() {
+    let data: Vec<u8> = (0..20_000u32).map(|i| (i % 256) as u8).collect();
+    assert_eq!(run_term_gc(&c(Comb::I), &data, 2048), data);
+}
+
 /// The peephole pass must not change observable behaviour. Each program here is
 /// extensionally `I` but written to trigger a specific rewrite.
 #[test]

@@ -1,5 +1,5 @@
 //! The ION-style combinator VM (ADR-0001): a flat-array heap reduced with an
-//! explicit spine stack, collected by a Cheney copying GC (ADR-0002, TODO).
+//! explicit spine stack, collected by a Cheney copying GC (ADR-0002).
 
 pub mod gc;
 pub mod heap;
@@ -9,11 +9,21 @@ use crate::term::Term;
 use heap::{Cell, Heap, Ref};
 use std::io::BufRead;
 
-/// A loaded program together with its runtime heap.
+/// Heap size (in cells) below which the collector never runs.
+const GC_FLOOR: usize = 1 << 16;
+
+/// A loaded program together with its runtime heap and reduction state.
 pub struct Vm {
     pub heap: Heap,
     /// Root of the program graph (the combinator term to apply to the input).
     pub root: Ref,
+    /// Shared reduction stack. Nested `whnf` calls stack their spines on top of
+    /// the caller's, remembering a base index; the whole vector is a GC root.
+    pub(crate) spine: Vec<Ref>,
+    /// Extra GC roots that live across `whnf` calls (the I/O driver's refs).
+    pub(crate) roots: Vec<Ref>,
+    /// Collect once the heap grows to this many cells.
+    pub(crate) gc_threshold: usize,
     /// The input byte source, installed for the duration of [`Vm::run`].
     pub(crate) input: Option<Box<dyn BufRead>>,
 }
@@ -26,8 +36,17 @@ impl Vm {
         Vm {
             heap,
             root,
+            spine: Vec::new(),
+            roots: Vec::new(),
+            gc_threshold: GC_FLOOR,
             input: None,
         }
+    }
+
+    /// Override the collection threshold (used by tests to force frequent GC).
+    #[doc(hidden)]
+    pub fn set_gc_threshold(&mut self, cells: usize) {
+        self.gc_threshold = cells.max(64);
     }
 
     /// Run the program: `output = program input`, streaming bytes.
@@ -52,6 +71,18 @@ impl Vm {
             },
             None => crate::io::EOF,
         }
+    }
+
+    /// Collect the heap, remapping the spine and root vectors.
+    pub(crate) fn gc(&mut self) {
+        {
+            let Vm {
+                heap, spine, roots, ..
+            } = self;
+            gc::collect(heap.cells_mut(), spine, roots);
+        }
+        // Grow the threshold to keep amortized collection cost low.
+        self.gc_threshold = GC_FLOOR.max(self.heap.len() * 2);
     }
 
     #[inline]

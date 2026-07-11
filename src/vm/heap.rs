@@ -75,6 +75,11 @@ impl Heap {
         }
     }
 
+    /// Mutable access to the backing cell vector, for the collector.
+    pub(crate) fn cells_mut(&mut self) -> &mut Vec<Cell> {
+        &mut self.cells
+    }
+
     pub fn len(&self) -> usize {
         self.cells.len()
     }
