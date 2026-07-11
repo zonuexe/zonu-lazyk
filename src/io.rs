@@ -71,13 +71,13 @@ fn drive_loop<W: Write>(
 /// `head Inc 0`.
 fn numeral_value(vm: &mut Vm, head_slot: usize) -> Result<u32, Error> {
     let inc = vm.alloc(Cell::Comb(Comb::Inc));
-    let zero = vm.alloc(Cell::Num(0));
+    let zero = vm.alloc(Cell::Acc(0));
     let head = vm.roots[head_slot];
     let e = vm.app(head, inc);
     let e = vm.app(e, zero);
     let r = vm.whnf(e);
     match vm.heap.get(r) {
-        Cell::Num(v) => Ok(v),
+        Cell::Acc(v) => Ok(v),
         other => Err(Error::IllFormedOutput(format!(
             "output list element is not a Church numeral (reduced to {other:?})"
         ))),

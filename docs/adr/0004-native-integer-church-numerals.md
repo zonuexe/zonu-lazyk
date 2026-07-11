@@ -6,13 +6,35 @@ Output bytes are Church numerals forced by applying them to successor/zero; naiv
 
 ## Decision
 
-Add a native integer cell type (`Num`) and primitive combinators (`inc`, `zero`, …). Precompute the input numerals `0..=256` as a cached table fed into the input stream; extract output numerals with a native counter fast path. EOF is a numeral `>= 256`.
+Two distinct native cell types at the I/O boundary:
+
+- `Num(n)` — an input byte. It behaves as the Church numeral it stands for when
+  applied: `Num(n) f x = f^n x`, unfolded one lazy layer per step
+  (`n f x = f ((n-1) f x)`) so a single step allocates O(1).
+- `Acc(k)` — the church2int counting accumulator, seeded as `Acc(0)`.
+
+Extraction mirrors the reference interpreter's argument-swap protocol:
+
+- `Inc x = x Inc` — Inc hands *itself* to its argument rather than forcing it.
+- `Acc(k) Inc = Acc(k+1)` — the accumulator does the actual increment.
+- church2int evaluates `head Inc Acc(0)` and reads the resulting `Acc(v)`.
+
+EOF is a numeral `>= 256`.
 
 ## Why
 
-A native `Num` behaves identically to the corresponding Church numeral when applied, so semantics are preserved, but I/O-boundary construction and extraction become O(1)/O(value-on-native-counter) instead of driving combinator reductions. This is the second major performance lever alongside ADR-0003.
+The swap protocol is what makes higher-order uses of a numeral work: `Inc (K Inc)`
+reduces to `(K Inc) Inc = Inc`, whereas a naive "force the argument to a number"
+`Inc` gets stuck on any non-numeral argument. Keeping `Num` (a program's Church
+numerals) and `Acc` (our private counter) as **distinct** types means the counter
+rule can never collide with a program numeral.
 
 ## Consequences
 
-- The reducer must handle `Num` cells wherever a combinator could appear (application to `Num`, forcing, GC copying).
-- Only the I/O boundary is optimized; a program that arbitrarily transforms a byte still pays real reduction cost — deliberately not collapsing arbitrary Church numerals in the graph (that would risk sharing/semantics).
+- The reducer handles `Num`/`Acc` wherever a combinator could appear (application,
+  forcing, GC copying); both are GC leaves.
+- Only the I/O boundary is optimized; a program that arbitrarily transforms a byte
+  still pays real reduction cost — we deliberately do not collapse arbitrary Church
+  numerals in the graph.
+- `Acc` is never exposed to the program (the parser emits only S/K/I; `Inc`/`Acc`
+  enter solely via church2int), so there is no interaction with user terms.

@@ -67,6 +67,28 @@ impl Vm {
                     node = redex;
                 }
 
+                // The counting accumulator: `Acc(k) Inc = Acc(k+1)`. It is only
+                // ever produced/consumed by church2int and only meets `Inc`.
+                Cell::Acc(k) => {
+                    if self.spine.len() == base {
+                        return node; // a bare accumulator is the final value.
+                    }
+                    let redex = self.spine[self.spine.len() - 1];
+                    let mut arg = self.arg(redex);
+                    while let Cell::Ind(t) = self.heap.get(arg) {
+                        arg = t;
+                    }
+                    if matches!(self.heap.get(arg), Cell::Comb(Comb::Inc)) {
+                        let next = self.alloc(Cell::Acc(k + 1));
+                        self.heap.set(redex, Cell::Ind(next));
+                        self.spine.pop();
+                        node = redex;
+                    } else {
+                        // Applied to anything but Inc — ill-formed output.
+                        return self.finish(base, node);
+                    }
+                }
+
                 Cell::Input => {
                     let byte = self.read_input_byte();
                     let head = self.alloc(Cell::Num(byte));
@@ -163,23 +185,13 @@ impl Vm {
                             let cfx = self.app(cc, fx);
                             self.heap.set(redex, Cell::App(cfx, g));
                         }
-                        // Inc n = n + 1. Forces its argument, which recurses into
-                        // `whnf` and may collect, so re-fetch the redex after.
+                        // Inc x = x Inc (the reference's argument-swap trick).
+                        // Delegates counting to the argument, which handles the
+                        // higher-order cases the naive "force to a number" cannot.
+                        // `node` is the Inc cell itself; reuse it as the operand.
                         Comb::Inc => {
                             let x = self.arg(self.spine[sl - 1]);
-                            let xw = self.whnf(x);
-                            let redex = self.spine[self.spine.len() - 1];
-                            match self.heap.get(xw) {
-                                Cell::Num(k) => {
-                                    let next = self.alloc(Cell::Num(k + 1));
-                                    self.heap.set(redex, Cell::Ind(next));
-                                }
-                                // Inc of a non-number is stuck: expose as WHNF.
-                                _ => return self.finish(base, node),
-                            }
-                            self.spine.truncate(self.spine.len() - 1);
-                            node = redex;
-                            continue;
+                            self.heap.set(redex, Cell::App(x, node));
                         }
                     }
 

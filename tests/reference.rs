@@ -132,6 +132,86 @@ fn gc_cat_large_input() {
     assert_eq!(run_term_gc(&c(Comb::I), &data, 2048), data);
 }
 
+/// Render a term in each surface notation, so one term can be run four ways.
+fn render(t: &Term, notation: char) -> String {
+    fn go(t: &Term, n: char, out: &mut String) {
+        match t {
+            Term::Comb(Comb::S) => out.push('s'),
+            Term::Comb(Comb::K) => out.push('k'),
+            Term::Comb(Comb::I) => out.push('i'),
+            Term::Comb(other) => panic!("cannot render {other:?} (compiler-only)"),
+            Term::Num(_) => panic!("cannot render Num"),
+            Term::App(a, b) => match n {
+                // CC: parenthesized juxtaposition.
+                'c' => {
+                    out.push('(');
+                    go(a, n, out);
+                    go(b, n, out);
+                    out.push(')');
+                }
+                // Unlambda: backtick prefix application.
+                'u' => {
+                    out.push('`');
+                    go(a, n, out);
+                    go(b, n, out);
+                }
+                // Iota: star prefix application.
+                '*' => {
+                    out.push('*');
+                    go(a, n, out);
+                    go(b, n, out);
+                }
+                _ => unreachable!(),
+            },
+        }
+    }
+    let mut s = String::new();
+    go(t, notation, &mut s);
+    s
+}
+
+/// The same SKI term written in CC, Unlambda, and Iota (`*`) notation must parse
+/// and run identically — the core Iota coverage (`i` = I, `*` = apply).
+#[test]
+fn notation_equivalence() {
+    use Comb::*;
+    let terms = [
+        c(I),
+        ap(ap(c(S), c(K)), c(K)),                               // S K K
+        ap(ap(c(S), ap(c(K), c(I))), c(I)),                     // S (K I) I
+        ap(ap(c(S), c(K)), ap(c(K), c(I))),                     // S K (K I)
+        ap(ap(c(S), ap(c(K), c(I))), ap(ap(c(S), c(K)), c(K))), // S (K I)(S K K)
+    ];
+    for t in &terms {
+        let base = run_term(t, b"iOtA?");
+        for notation in ['c', 'u', '*'] {
+            let src = render(t, notation);
+            assert_eq!(run(&src, b"iOtA?"), base, "notation {notation}: {src}");
+        }
+    }
+}
+
+/// Regression: whitespace and `#` comments never break a Jot number — the bits
+/// of one Jot program may be split across spaces, newlines, and comments (the
+/// reference reader skips whitespace at the character level).
+#[test]
+fn jot_spans_whitespace() {
+    // Same Jot number, contiguous vs. split three ways — all must agree.
+    let contiguous = run("11100100", b"Zz");
+    assert_eq!(run("1 1 1 0 0 1 0 0", b"Zz"), contiguous);
+    assert_eq!(run("111\n001\n00", b"Zz"), contiguous);
+    assert_eq!(run("11100 # mid\n100", b"Zz"), contiguous);
+}
+
+/// Regression: higher-order use of `Inc` (argument-swap protocol). This minimal
+/// program applies an input char in a higher-order position; the naive
+/// force-to-a-number `Inc` got stuck here.
+#[test]
+fn higher_order_inc_regression() {
+    // ``SS`K`SI on input "ab" yields byte 0x01 (verified against the reference).
+    assert_eq!(run("``SS`K`SI", b"ab"), b"\x01");
+}
+
 /// The peephole pass must not change observable behaviour. Each program here is
 /// extensionally `I` but written to trigger a specific rewrite.
 #[test]

@@ -16,8 +16,12 @@ pub enum Cell {
     App(Ref, Ref),
     /// A combinator symbol.
     Comb(Comb),
-    /// A native integer Church numeral (ADR-0004).
+    /// A native integer Church numeral (ADR-0004). Behaves as a Church numeral
+    /// when applied: `Num(n) f x = f^n x`.
     Num(u32),
+    /// The church2int counting accumulator (ADR-0004). Distinct from `Num` so
+    /// it never collides with a program's Church numerals. `Acc(k) Inc = Acc(k+1)`.
+    Acc(u32),
     /// Indirection to another cell (result of an in-place update).
     Ind(Ref),
     /// A native list cell that behaves as `\f. f head tail`. Used for the input

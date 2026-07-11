@@ -149,20 +149,31 @@ impl Parser<'_> {
         }
     }
 
-    /// Parse a maximal run of `0`/`1` as a Jot program.
+    /// Parse a Jot program: a run of `0`/`1` bits.
     ///
     ///   [ε]  = I
     ///   [w0] = [w] S K
     ///   [w1] = S (K [w])
+    ///
+    /// The reference reader skips whitespace and comments at the character
+    /// level everywhere (`getch` loops `while (isspace(ch))`), so a single Jot
+    /// number continues across whitespace and `#` comments — the bits need not
+    /// be contiguous.
     fn parse_jot(&mut self) -> Term {
         let mut acc = Term::comb(Comb::I);
-        while let Some(bit @ (b'0' | b'1')) = self.peek() {
-            self.pos += 1;
-            acc = if bit == b'0' {
-                Term::app(Term::app(acc, Term::comb(Comb::S)), Term::comb(Comb::K))
-            } else {
-                Term::app(Term::comb(Comb::S), Term::app(Term::comb(Comb::K), acc))
-            };
+        loop {
+            self.skip_trivia();
+            match self.peek() {
+                Some(b'0') => {
+                    self.pos += 1;
+                    acc = Term::app(Term::app(acc, Term::comb(Comb::S)), Term::comb(Comb::K));
+                }
+                Some(b'1') => {
+                    self.pos += 1;
+                    acc = Term::app(Term::comb(Comb::S), Term::app(Term::comb(Comb::K), acc));
+                }
+                _ => break,
+            }
         }
         acc
     }
