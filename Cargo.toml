@@ -1,0 +1,20 @@
+[package]
+name = "zonu-lazyk"
+version = "0.1.0"
+edition = "2024"
+description = "A performance-oriented Lazy K interpreter (ION-style combinator VM)"
+license = "GPL-3.0-or-later"
+repository = "https://github.com/zonuexe/zonu-lazyk"
+
+[[bin]]
+name = "zonu-lazyk"
+path = "src/main.rs"
+
+[lib]
+name = "zonu_lazyk"
+path = "src/lib.rs"
+
+[profile.release]
+lto = true
+codegen-units = 1
+panic = "abort"
