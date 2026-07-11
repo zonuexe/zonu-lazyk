@@ -9,8 +9,8 @@ use crate::term::{Comb, Term};
 /// Index of a cell in the heap.
 pub type Ref = u32;
 
-/// A single heap cell. Fixed size, uniform layout so GC can copy blindly.
-#[derive(Debug, Clone, Copy)]
+/// A single heap cell.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Cell {
     /// Application `a b` — operator `a` applied to operand `b`.
     App(Ref, Ref),
@@ -20,6 +20,13 @@ pub enum Cell {
     Num(u32),
     /// Indirection to another cell (result of an in-place update).
     Ind(Ref),
+    /// A native list cell that behaves as `\f. f head tail`. Used for the input
+    /// stream; applying it to one argument `f` yields `f head tail`.
+    Cons(Ref, Ref),
+    /// A not-yet-read position in the input byte stream. Forcing it reads the
+    /// next byte from stdin and rewrites this cell into a `Cons` (memoization),
+    /// so each byte is read exactly once and in order.
+    Input,
 }
 
 pub struct Heap {
@@ -31,17 +38,26 @@ impl Heap {
         Heap { cells: Vec::new() }
     }
 
+    pub fn with_capacity(cap: usize) -> Heap {
+        Heap {
+            cells: Vec::with_capacity(cap),
+        }
+    }
+
+    #[inline]
     pub fn alloc(&mut self, cell: Cell) -> Ref {
-        // TODO: bump-allocate into to-space; trigger `gc::collect` when full.
+        // TODO(ADR-0002): trigger `gc::collect` when a fill threshold is reached.
         let r = self.cells.len() as Ref;
         self.cells.push(cell);
         r
     }
 
+    #[inline]
     pub fn get(&self, r: Ref) -> Cell {
         self.cells[r as usize]
     }
 
+    #[inline]
     pub fn set(&mut self, r: Ref, cell: Cell) {
         self.cells[r as usize] = cell;
     }

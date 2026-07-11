@@ -37,7 +37,7 @@ impl From<parser::ParseError> for Error {
 }
 
 /// Parse `program_src`, run it over `input`, and write the output byte stream to `output`.
-pub fn run<R: std::io::Read, W: std::io::Write>(
+pub fn run<R: std::io::Read + 'static, W: std::io::Write>(
     program_src: &str,
     input: R,
     output: W,
