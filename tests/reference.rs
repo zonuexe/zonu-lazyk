@@ -136,9 +136,11 @@ fn gc_cat_large_input() {
 fn render(t: &Term, notation: char) -> String {
     fn go(t: &Term, n: char, out: &mut String) {
         match t {
-            Term::Comb(Comb::S) => out.push('s'),
-            Term::Comb(Comb::K) => out.push('k'),
-            Term::Comb(Comb::I) => out.push('i'),
+            // Uppercase atoms are `S`/`K`/`I` in every notation; lowercase `i`
+            // would be the iota combinator under `*`, so avoid it here.
+            Term::Comb(Comb::S) => out.push('S'),
+            Term::Comb(Comb::K) => out.push('K'),
+            Term::Comb(Comb::I) => out.push('I'),
             Term::Comb(other) => panic!("cannot render {other:?} (compiler-only)"),
             Term::Num(_) => panic!("cannot render Num"),
             Term::App(a, b) => match n {
@@ -189,6 +191,13 @@ fn notation_equivalence() {
             assert_eq!(run(&src, b"iOtA?"), base, "notation {notation}: {src}");
         }
     }
+}
+
+/// In Iota, `*ii` = ι ι = I, so it behaves as `cat`. Exercises `i` = ι under `*`.
+#[test]
+fn iota_combinator_runs() {
+    assert_eq!(run("*ii", b"iota!"), b"iota!");
+    assert_eq!(run("* i i", b"OK"), b"OK"); // whitespace between iota tokens
 }
 
 /// Regression: whitespace and `#` comments never break a Jot number — the bits

@@ -40,6 +40,17 @@ pub fn parse(src: &str) -> Result<Term, ParseError> {
     Ok(term)
 }
 
+/// Barker's iota combinator `ι = \f. f S K`, as the SKI term
+/// `S (S I (K S)) (K K)` (the reference's encoding).
+fn iota() -> Term {
+    let s = || Term::comb(Comb::S);
+    let k = || Term::comb(Comb::K);
+    let i = || Term::comb(Comb::I);
+    // S (S I (K S)) (K K)
+    let si_ks = Term::app(Term::app(s(), i()), Term::app(k(), s()));
+    Term::app(Term::app(s(), si_ks), Term::app(k(), k()))
+}
+
 struct Parser<'a> {
     bytes: &'a [u8],
     pos: usize,
@@ -98,7 +109,7 @@ impl Parser<'_> {
                     return Err(self.error("unmatched `)`"));
                 }
                 Some(_) => {
-                    let t = self.parse_term()?;
+                    let t = self.parse_term(false)?;
                     acc = Some(match acc {
                         None => t,
                         Some(f) => Term::app(f, t),
@@ -111,7 +122,11 @@ impl Parser<'_> {
 
     /// Parse a single term: an atom, a prefix application, a parenthesized
     /// sequence, or a Jot run.
-    fn parse_term(&mut self) -> Result<Term, ParseError> {
+    ///
+    /// `i_is_iota` is set only while parsing a direct operand of `*`: there a
+    /// lowercase `i` denotes Barker's iota combinator, matching the reference
+    /// (`parse_expr(..., ch == '*')`). Everywhere else `i` is `I`.
+    fn parse_term(&mut self, i_is_iota: bool) -> Result<Term, ParseError> {
         self.skip_trivia();
         let start = self.pos;
         match self.bump() {
@@ -119,9 +134,10 @@ impl Parser<'_> {
                 message: "unexpected end of input".to_string(),
                 offset: start,
             }),
-            Some(b'`') | Some(b'*') => {
-                let f = self.parse_term()?;
-                let x = self.parse_term()?;
+            Some(op @ (b'`' | b'*')) => {
+                let operand_is_iota = op == b'*';
+                let f = self.parse_term(operand_is_iota)?;
+                let x = self.parse_term(operand_is_iota)?;
                 Ok(Term::app(f, x))
             }
             Some(b'(') => {
@@ -137,6 +153,8 @@ impl Parser<'_> {
             }
             Some(b's') | Some(b'S') => Ok(Term::comb(Comb::S)),
             Some(b'k') | Some(b'K') => Ok(Term::comb(Comb::K)),
+            // Lowercase `i` is the iota combinator only as a direct `*` operand.
+            Some(b'i') if i_is_iota => Ok(iota()),
             Some(b'i') | Some(b'I') => Ok(Term::comb(Comb::I)),
             Some(b'0') | Some(b'1') => {
                 self.pos = start; // let the jot reader consume the whole run
@@ -176,5 +194,36 @@ impl Parser<'_> {
             }
         }
         acc
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{iota, parse};
+    use crate::term::{Comb, Term};
+
+    fn i() -> Term {
+        Term::comb(Comb::I)
+    }
+
+    #[test]
+    fn lowercase_i_is_iota_only_as_star_operand() {
+        // `i` is the iota combinator only as a direct operand of `*`.
+        assert_eq!(parse("*ii").unwrap(), Term::app(iota(), iota()));
+        // Under backtick, at top level, and uppercase `I` are all `I`.
+        assert_eq!(parse("`ii").unwrap(), Term::app(i(), i()));
+        assert_eq!(parse("ii").unwrap(), Term::app(i(), i()));
+        assert_eq!(parse("*II").unwrap(), Term::app(i(), i()));
+        // Nested: only the immediate `*` operand `i` is iota; inside parens it is I.
+        assert_eq!(parse("*(i)i").unwrap(), Term::app(i(), iota()));
+    }
+
+    #[test]
+    fn jot_spans_whitespace_and_comments() {
+        // One Jot number split by whitespace/newlines/comments == contiguous.
+        let contiguous = parse("10110").unwrap();
+        assert_eq!(parse("1 0 1 1 0").unwrap(), contiguous);
+        assert_eq!(parse("10\n11\n0").unwrap(), contiguous);
+        assert_eq!(parse("101 # c\n10").unwrap(), contiguous);
     }
 }
