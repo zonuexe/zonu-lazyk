@@ -34,12 +34,17 @@ Workload for a 2000-byte input (steps = whnf loop iterations):
 The remaining `rot13`/`reverse` gap to the reference is not allocation or bounds
 checks; it is per-step memory traffic and cache behaviour. Ranked next steps:
 
-1. **Shrink `Cell` 12 → 8 bytes** (tagged `u64`: small tag + two packed refs).
-   Cuts heap footprint by a third — the most promising cache win, low risk.
+1. **Shrink `Cell` 12 → 8 bytes** — DONE. Storage is now a packed `u64` (tag in
+   the top 3 bits; `App`/`Cons` hold two 30-bit refs; `Cell` stays the logical
+   view via encode/decode in `heap`/`gc`). Result: `cat` −25%, `rot13` −34%,
+   `reverse` −39%. This closed almost the whole gap — on 20 KB inputs `rot13` now
+   matches the reference and `reverse` is within ~1.1x.
 2. **Threaded / spineless spine.** The reference threads the spine through the
-   graph's operator field instead of a side `Vec`; better locality. Larger change.
+   graph's operator field instead of a side `Vec`; better locality. Larger change,
+   now lower priority given (1)'s result.
 3. **Deeper combinator optimization** to cut step count (director strings, or a
    richer peephole) — helps compute-bound programs like `rot13`.
 
-Deferred: the interpreter is correct and reference-compatible across all four
-notations; shipping the SKI-focused release does not depend on closing this gap.
+The interpreter is correct and reference-compatible across all four notations and
+now performs on par with the reference; the SKI-focused release does not depend
+on further optimization.

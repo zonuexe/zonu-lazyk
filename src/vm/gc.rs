@@ -3,14 +3,15 @@
 //! Roots are the shared spine stack plus the explicit root vector (the I/O
 //! driver's live refs). Live cells are copied breadth-first into a fresh space
 //! and compacted; `Ind` chains are shortcut during copying, so the compacted
-//! heap contains no indirections.
+//! heap contains no indirections. Cells are stored packed (see `heap`); the
+//! collector copies the raw words and only decodes to chase refs.
 
-use super::heap::{Cell, Ref};
+use super::heap::{Cell, Ref, decode, encode};
 
-/// Resolve indirections from `r`, then copy the target into `to` if it has not
-/// been copied yet, recording the forwarding index. Returns the new index.
-fn forward(from: &[Cell], to: &mut Vec<Cell>, fwd: &mut [u32], mut r: Ref) -> Ref {
-    while let Cell::Ind(t) = from[r as usize] {
+/// Resolve indirections from `r`, then copy the target word into `to` if it has
+/// not been copied yet, recording the forwarding index. Returns the new index.
+fn forward(from: &[u64], to: &mut Vec<u64>, fwd: &mut [u32], mut r: Ref) -> Ref {
+    while let Cell::Ind(t) = decode(from[r as usize]) {
         r = t;
     }
     let ru = r as usize;
@@ -25,9 +26,9 @@ fn forward(from: &[Cell], to: &mut Vec<Cell>, fwd: &mut [u32], mut r: Ref) -> Re
 
 /// Collect `cells` in place, remapping every reference in `spine` and `roots`.
 /// After it returns, `cells` holds only the live, compacted graph.
-pub(crate) fn collect(cells: &mut Vec<Cell>, spine: &mut [Ref], roots: &mut [Ref]) {
+pub(crate) fn collect(cells: &mut Vec<u64>, spine: &mut [Ref], roots: &mut [Ref]) {
     let from = std::mem::take(cells);
-    let mut to: Vec<Cell> = Vec::with_capacity(from.len());
+    let mut to: Vec<u64> = Vec::with_capacity(from.len());
     let mut fwd = vec![u32::MAX; from.len()];
 
     for r in spine.iter_mut() {
@@ -40,20 +41,23 @@ pub(crate) fn collect(cells: &mut Vec<Cell>, spine: &mut [Ref], roots: &mut [Ref
     // Cheney scan: `to` doubles as the work queue.
     let mut scan = 0;
     while scan < to.len() {
-        let updated = match to[scan] {
+        let updated = match decode(to[scan]) {
             Cell::App(a, b) => {
                 let a = forward(&from, &mut to, &mut fwd, a);
                 let b = forward(&from, &mut to, &mut fwd, b);
-                Cell::App(a, b)
+                Some(Cell::App(a, b))
             }
             Cell::Cons(h, t) => {
                 let h = forward(&from, &mut to, &mut fwd, h);
                 let t = forward(&from, &mut to, &mut fwd, t);
-                Cell::Cons(h, t)
+                Some(Cell::Cons(h, t))
             }
-            leaf => leaf, // Comb, Num, Input have no references; Ind never copied.
+            // Comb, Num, Acc, Input have no references; Ind is never copied.
+            _ => None,
         };
-        to[scan] = updated;
+        if let Some(cell) = updated {
+            to[scan] = encode(cell);
+        }
         scan += 1;
     }
 
