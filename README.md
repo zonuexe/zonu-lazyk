@@ -31,8 +31,14 @@ Domain vocabulary lives in [CONTEXT.md](CONTEXT.md).
 
 ## Status
 
-Scaffold. Module layout is in place with the pipeline stubbed; see `todo!()`
-markers in `src/` and the ignored tests in `tests/reference.rs`.
+Working interpreter. The full pipeline runs — parser (all four notations),
+peephole optimizer, ION-style reducer with extended combinators and native
+numerals, and a Cheney copying GC that bounds the heap on streaming workloads.
+`cargo test` covers every reducer and peephole rule plus GC under pressure; the
+release binary `cat`s hundreds of KB exactly while collecting repeatedly.
+
+Not yet done: a corpus of tromp's reference programs (hello-world, reverse,
+primes) as end-to-end fixtures, and `criterion` benchmarks.
 
 ## License
 
