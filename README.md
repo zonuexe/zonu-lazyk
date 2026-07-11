@@ -31,14 +31,23 @@ Domain vocabulary lives in [CONTEXT.md](CONTEXT.md).
 
 ## Status
 
-Working interpreter. The full pipeline runs — parser (all four notations),
-peephole optimizer, ION-style reducer with extended combinators and native
-numerals, and a Cheney copying GC that bounds the heap on streaming workloads.
-`cargo test` covers every reducer and peephole rule plus GC under pressure; the
-release binary `cat`s hundreds of KB exactly while collecting repeatedly.
+Reference-compatible across all four notations (CC, Unlambda, Iota with the
+`ι` combinator under `*`, and Jot). The full pipeline runs — parser, peephole
+optimizer, ION-style reducer with extended combinators and native numerals, and
+a Cheney copying GC that bounds the heap on streaming workloads.
 
-Not yet done: a corpus of tromp's reference programs (hello-world, reverse,
-primes) as end-to-end fixtures, and `criterion` benchmarks.
+Verified by:
+
+- **Conformance fixtures** from the reference distribution — `reverse.lazy`
+  (Jot), `rot13.lazy` (CC/Unlambda), `hello.lazy` (mixed) — in `tests/`.
+- **Differential fuzzing** against the reference interpreter: 0 mismatches over
+  thousands of random programs, including pure-iota and whitespace-split Jot.
+- Unit tests for every reducer and peephole rule, notation equivalence, and GC
+  under pressure.
+
+`cargo bench` has criterion throughput benchmarks. church2int extraction is
+O(1) per numeral; `cat` runs at ~18 MiB/s. Programs bound by their own reduction
+(e.g. `rot13`, `reverse`) are the next optimization target.
 
 ## License
 
