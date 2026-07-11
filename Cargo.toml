@@ -14,6 +14,13 @@ path = "src/main.rs"
 name = "zonu_lazyk"
 path = "src/lib.rs"
 
+[dev-dependencies]
+criterion = { version = "0.5", default-features = false, features = ["cargo_bench_support"] }
+
+[[bench]]
+name = "interp"
+harness = false
+
 [profile.release]
 lto = true
 codegen-units = 1
