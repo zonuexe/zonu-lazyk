@@ -39,12 +39,16 @@ fn drive_loop<W: Write>(
     list_slot: usize,
     out: &mut BufWriter<W>,
 ) -> Result<(), Error> {
+    let mut written: u64 = 0;
     loop {
         // head = list K
         let k = vm.alloc(Cell::Comb(Comb::K));
         let list = vm.roots[list_slot];
         let head_expr = vm.app(list, k);
         let head = vm.whnf(head_expr);
+        if vm.step_limit_hit {
+            return Err(Error::StepLimit);
+        }
 
         // Protect `head` across the numeral extraction (which may collect).
         let head_slot = vm.roots.len();
@@ -55,7 +59,11 @@ fn drive_loop<W: Write>(
         if value >= EOF {
             return Ok(());
         }
+        if written >= vm.max_output {
+            return Err(Error::OutputLimit);
+        }
         out.write_all(&[value as u8])?;
+        written += 1;
 
         // tail = list (K I)
         let k = vm.alloc(Cell::Comb(Comb::K));
@@ -76,6 +84,9 @@ fn numeral_value(vm: &mut Vm, head_slot: usize) -> Result<u32, Error> {
     let e = vm.app(head, inc);
     let e = vm.app(e, zero);
     let r = vm.whnf(e);
+    if vm.step_limit_hit {
+        return Err(Error::StepLimit);
+    }
     match vm.heap.get(r) {
         Cell::Acc(v) => Ok(v),
         other => Err(Error::IllFormedOutput(format!(

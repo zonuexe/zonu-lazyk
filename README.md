@@ -17,6 +17,33 @@ The program is read from `<program-file>` in any mixture of the four notations
 stream; standard output receives the output byte stream. A numeral `>= 256`
 signals end of stream.
 
+## Embedding
+
+zonu-lazyk is also a library. Compile a program once and run it against any
+`Read`/`Write` pair or in-memory bytes:
+
+```rust
+use zonu_lazyk::Program;
+
+let cat = Program::compile("I")?;          // `I` is the identity — Lazy K's `cat`
+let out = cat.eval(b"hello")?;             // -> Vec<u8>
+assert_eq!(out, b"hello");
+```
+
+For untrusted programs (Lazy K can loop forever or emit an unbounded stream), set
+[`Limits`]:
+
+```rust
+use zonu_lazyk::{Error, Limits, Program};
+
+let omega = Program::compile("``SII``SII")?;    // diverges
+let limits = Limits { max_steps: Some(100_000), ..Limits::none() };
+assert!(matches!(omega.eval_with(b"", &limits), Err(Error::StepLimit)));
+```
+
+See [`examples/embed.rs`](examples/embed.rs). The API is `0.x`-unstable — pin an
+exact version. The pipeline modules are exposed only as unstable internals.
+
 ## Design
 
 The interpreter compiles the program and reduces it on a custom combinator VM.

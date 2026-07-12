@@ -24,6 +24,13 @@ pub struct Vm {
     pub(crate) roots: Vec<Ref>,
     /// Collect once the heap grows to this many cells.
     pub(crate) gc_threshold: usize,
+    /// Reduction-step ceiling (`u64::MAX` = unlimited); the count so far; and
+    /// whether the ceiling was hit (ADR-0007). Checked once per `whnf` iteration.
+    pub(crate) max_steps: u64,
+    pub(crate) steps: u64,
+    pub(crate) step_limit_hit: bool,
+    /// Output-byte ceiling (`u64::MAX` = unlimited); enforced by the I/O driver.
+    pub(crate) max_output: u64,
     /// The input byte source, installed for the duration of [`Vm::run`].
     pub(crate) input: Option<Box<dyn BufRead>>,
 }
@@ -39,6 +46,10 @@ impl Vm {
             spine: Vec::new(),
             roots: Vec::new(),
             gc_threshold: GC_FLOOR,
+            max_steps: u64::MAX,
+            steps: 0,
+            step_limit_hit: false,
+            max_output: u64::MAX,
             input: None,
         }
     }
@@ -47,6 +58,12 @@ impl Vm {
     #[doc(hidden)]
     pub fn set_gc_threshold(&mut self, cells: usize) {
         self.gc_threshold = cells.max(64);
+    }
+
+    /// Apply opt-in resource limits (ADR-0007). `None` means unlimited.
+    pub(crate) fn set_limits(&mut self, limits: &crate::Limits) {
+        self.max_steps = limits.max_steps.unwrap_or(u64::MAX);
+        self.max_output = limits.max_output_bytes.unwrap_or(u64::MAX);
     }
 
     /// Run the program: `output = program input`, streaming bytes.

@@ -38,6 +38,16 @@ impl Vm {
         let mut node = root;
 
         loop {
+            // Reduction-step ceiling (ADR-0007). Unlimited unless a limit is set,
+            // so the common path is one comparison against `u64::MAX`.
+            if self.max_steps != u64::MAX {
+                self.steps += 1;
+                if self.steps > self.max_steps {
+                    self.step_limit_hit = true;
+                    return self.finish(base, node);
+                }
+            }
+
             // Safe point: collect if the heap has grown enough. `node` is the
             // only live reference not already in `spine`/`roots`, so protect it.
             if self.heap.len() >= self.gc_threshold {

@@ -6,6 +6,15 @@ All notable changes to zonu-lazyk are documented here. The format is based on
 
 ## [Unreleased]
 
+### Added
+
+- **A curated embedding API** ([ADR-0006](docs/adr/0006-embedding-api.md)): `Program::compile(src)` parses and optimizes once, then `run`/`run_with` stream to any `Write` and `eval`/`eval_with` return a `Vec<u8>` — compile once, run many times. The pipeline modules (`parser`, `vm`, …) are now documented as unstable internals rather than the embedding contract; while the crate is `0.x`, `Program`/`Limits`/`Error` may change between minor versions.
+- **Opt-in resource limits for untrusted programs** ([ADR-0007](docs/adr/0007-embedding-hardening.md)): `Limits { max_steps, max_output_bytes }` bound one run. `max_steps` stops a non-terminating program with `Error::StepLimit`; `max_output_bytes` stops an unbounded output stream with `Error::OutputLimit`. Both default to unlimited, and with no limit the step check is a single comparison per reduction.
+
+### Changed
+
+- `Error` now implements `Display` and `std::error::Error` (with a `source()` chain for parse and I/O errors), so embedders can use `?`, `Box<dyn Error>`, and `{}` normally. The CLI prints errors via `Display`.
+
 ## [0.1.0] - 2026-07-12
 
 ### Added

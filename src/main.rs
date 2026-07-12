@@ -24,7 +24,7 @@ fn main() -> ExitCode {
     match zonu_lazyk::run(&src, stdin, stdout) {
         Ok(()) => ExitCode::SUCCESS,
         Err(e) => {
-            eprintln!("zonu-lazyk: {e:?}");
+            eprintln!("zonu-lazyk: {e}");
             ExitCode::FAILURE
         }
     }
