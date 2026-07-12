@@ -82,7 +82,7 @@ impl Vm {
                     if matches!(self.resolve(f), Cell::Comb(Comb::Inc))
                         && let Cell::Acc(k) = self.resolve(x)
                     {
-                        let acc = self.alloc(Cell::Acc(k + nv));
+                        let acc = self.alloc(Cell::Acc(k + nv as u64));
                         self.heap.set(redex, Cell::Ind(acc));
                     } else if nv == 0 {
                         self.heap.set(redex, Cell::Ind(x)); // 0 f x = x

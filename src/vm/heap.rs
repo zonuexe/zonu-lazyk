@@ -61,7 +61,10 @@ pub(crate) fn encode(cell: Cell) -> u64 {
         Cell::Cons(h, t) => (TAG_CONS << TAG_SHIFT) | (h as u64) | ((t as u64) << 30),
         Cell::Ind(t) => (TAG_IND << TAG_SHIFT) | (t as u64),
         Cell::Num(n) => (TAG_NUM << TAG_SHIFT) | (n as u64),
-        Cell::Acc(k) => (TAG_ACC << TAG_SHIFT) | (k as u64),
+        Cell::Acc(k) => {
+            debug_assert!(k < (1 << TAG_SHIFT), "Acc value exceeds 61 bits");
+            (TAG_ACC << TAG_SHIFT) | k
+        }
         Cell::Comb(c) => (TAG_COMB << TAG_SHIFT) | comb_id(c),
         Cell::Input => TAG_INPUT << TAG_SHIFT,
     }
@@ -74,7 +77,7 @@ pub(crate) fn decode(word: u64) -> Cell {
         TAG_CONS => Cell::Cons((word & REF_MASK) as u32, ((word >> 30) & REF_MASK) as u32),
         TAG_IND => Cell::Ind((word & REF_MASK) as u32),
         TAG_NUM => Cell::Num(word as u32),
-        TAG_ACC => Cell::Acc(word as u32),
+        TAG_ACC => Cell::Acc(word & ((1 << TAG_SHIFT) - 1)),
         TAG_COMB => Cell::Comb(comb_from(word & 0xFF)),
         _ => Cell::Input,
     }
@@ -92,7 +95,8 @@ pub enum Cell {
     Num(u32),
     /// The church2int counting accumulator (ADR-0004). Distinct from `Num` so
     /// it never collides with a program's Church numerals. `Acc(k) Inc = Acc(k+1)`.
-    Acc(u32),
+    /// Holds up to 61 bits so a decoded numeral is not capped at 256 (ADR-0008).
+    Acc(u64),
     /// Indirection to another cell (result of an in-place update).
     Ind(Ref),
     /// A native list cell that behaves as `\f. f head tail`. Used for the input

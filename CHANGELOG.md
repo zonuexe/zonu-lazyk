@@ -6,6 +6,14 @@ All notable changes to zonu-lazyk are documented here. The format is based on
 
 ## [Unreleased]
 
+### Added
+
+- **A decode API for embedders** ([ADR-0008](docs/adr/0008-decode-api-for-embedders.md)): `Program::eval_numeral()` reduces the program term to a Church numeral and returns its `u64` value with no 256 cap (so a decoded integer no longer has to be counted from N output bytes); `Program::eval_values(input, &DecodeOptions)` returns the output list as raw Church numerals (`Vec<u64>`) with a configurable/disable-able EOF sentinel; `Program::from_term(Term)` runs an already-built AST without a render-to-string / re-parse round-trip, and `Term`/`Comb` are re-exported at the crate root; `church_numeral(n)` builds a host integer as a native numeral term.
+
+### Changed
+
+- The church2int accumulator widened to 64-bit, so decoded numerals are no longer capped at 256. Byte-stream I/O is unchanged.
+
 ## [0.2.0] - 2026-07-12
 
 ### Added

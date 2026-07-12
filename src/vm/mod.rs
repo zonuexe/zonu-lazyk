@@ -78,15 +78,36 @@ impl Vm {
         res
     }
 
-    /// Read the next input byte, or [`crate::io::EOF`] (256) at end of stream.
+    /// Run over `input` and collect the output list as raw Church numerals
+    /// (ADR-0008). `eof` is the end sentinel; `max_values` a soft element cap.
+    pub fn run_values<R: std::io::Read + 'static>(
+        &mut self,
+        input: R,
+        eof: Option<u64>,
+        max_values: Option<u64>,
+    ) -> Result<Vec<u64>, crate::Error> {
+        self.input = Some(Box::new(std::io::BufReader::new(input)));
+        let res = crate::io::collect_values(self, eof, max_values);
+        self.input = None;
+        res
+    }
+
+    /// Evaluate the program term itself as a Church numeral (ADR-0008).
+    pub fn eval_numeral(&mut self) -> Result<u64, crate::Error> {
+        crate::io::eval_numeral(self)
+    }
+
+    /// Read the next input byte, or the EOF numeral 256 at end of stream. Fits a
+    /// `u32` (the input `Num` cells are bytes `0..=256`).
     pub(crate) fn read_input_byte(&mut self) -> u32 {
+        const INPUT_EOF: u32 = 256;
         let mut buf = [0u8; 1];
         match self.input.as_mut() {
             Some(r) => match r.read(&mut buf) {
                 Ok(1) => buf[0] as u32,
-                _ => crate::io::EOF,
+                _ => INPUT_EOF,
             },
-            None => crate::io::EOF,
+            None => INPUT_EOF,
         }
     }
 

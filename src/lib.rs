@@ -38,6 +38,13 @@ pub mod term;
 pub mod vm;
 
 pub use parser::ParseError;
+pub use term::{Comb, Term};
+
+/// Build the native Church numeral term for `n` — a host integer as a Lazy K
+/// value (ADR-0008). O(1); behaves as `\f x. f^n x` when applied.
+pub fn church_numeral(n: u32) -> Term {
+    Term::Num(n)
+}
 
 /// A compiled Lazy K program: parsed and optimized once, run many times.
 #[derive(Clone, Debug)]
@@ -51,6 +58,14 @@ impl Program {
         Ok(Program {
             term: compile::optimize(parser::parse(source)?),
         })
+    }
+
+    /// Build a program from an already-constructed [`Term`] (ADR-0008), skipping
+    /// the render-to-string / re-parse round-trip. The term is still optimized.
+    pub fn from_term(term: Term) -> Program {
+        Program {
+            term: compile::optimize(term),
+        }
     }
 
     /// Run over `input`, writing the output byte stream to `output`. Unlimited.
@@ -85,7 +100,63 @@ impl Program {
         self.run_with(std::io::Cursor::new(input.to_vec()), &mut out, limits)?;
         Ok(out)
     }
+
+    /// Evaluate the program term itself as a Church numeral and return its
+    /// integer value, with no 256 cap (ADR-0008). Use this to decode a computed
+    /// number directly instead of counting output bytes.
+    pub fn eval_numeral(&self) -> Result<u64, Error> {
+        self.eval_numeral_with(&Limits::none())
+    }
+
+    /// [`eval_numeral`](Self::eval_numeral) with resource limits.
+    pub fn eval_numeral_with(&self, limits: &Limits) -> Result<u64, Error> {
+        let mut vm = vm::Vm::load(&self.term);
+        vm.set_limits(limits);
+        vm.eval_numeral()
+    }
+
+    /// Run over `input` and return the output list as raw Church-numeral values
+    /// (ADR-0008), without truncating each to a byte. See [`DecodeOptions`] for
+    /// the end sentinel and bounds.
+    pub fn eval_values(&self, input: &[u8], opts: &DecodeOptions) -> Result<Vec<u64>, Error> {
+        let mut vm = vm::Vm::load(&self.term);
+        vm.set_limits(&Limits {
+            max_steps: opts.max_steps,
+            max_output_bytes: None,
+        });
+        vm.run_values(
+            std::io::Cursor::new(input.to_vec()),
+            opts.eof,
+            opts.max_values,
+        )
+    }
 }
+
+/// How [`Program::eval_values`] reads the output list.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct DecodeOptions {
+    /// End sentinel: a numeral `>= eof` ends the list. `Some(256)` is the Lazy K
+    /// default; `None` disables it (then bound the run with `max_values` and/or
+    /// `max_steps`).
+    pub eof: Option<u64>,
+    /// Stop after this many elements (returned as success). `None` = unbounded.
+    pub max_values: Option<u64>,
+    /// Reduction-step ceiling for divergence safety ([`Error::StepLimit`]).
+    pub max_steps: Option<u64>,
+}
+
+impl Default for DecodeOptions {
+    fn default() -> Self {
+        DecodeOptions {
+            eof: Some(EOF),
+            max_values: None,
+            max_steps: None,
+        }
+    }
+}
+
+/// The Lazy K end-of-stream sentinel: a numeral `>= 256`.
+pub const EOF: u64 = io::EOF;
 
 /// Opt-in resource limits for one run. `None` means unlimited; [`Limits::none`]
 /// (the `Default`) sets no limits.

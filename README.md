@@ -41,6 +41,20 @@ let limits = Limits { max_steps: Some(100_000), ..Limits::none() };
 assert!(matches!(omega.eval_with(b"", &limits), Err(Error::StepLimit)));
 ```
 
+To decode a *value* rather than a byte stream, evaluate a term to a Church
+numeral or read the output list as raw numerals:
+
+```rust
+use zonu_lazyk::{DecodeOptions, Program, church_numeral};
+
+// A computed number, with no 256 cap and no byte-counting.
+assert_eq!(Program::from_term(church_numeral(1000)).eval_numeral()?, 1000);
+
+// The output list as raw Church numerals instead of bytes.
+let vals = Program::compile("I")?.eval_values(b"Hi", &DecodeOptions::default())?;
+assert_eq!(vals, vec![72, 105]);
+```
+
 See [`examples/embed.rs`](examples/embed.rs). The API is `0.x`-unstable — pin an
 exact version. The pipeline modules are exposed only as unstable internals.
 
