@@ -6,6 +6,8 @@ All notable changes to zonu-lazyk are documented here. The format is based on
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-07-12
+
 ### Added
 
 - **A curated embedding API** ([ADR-0006](docs/adr/0006-embedding-api.md)): `Program::compile(src)` parses and optimizes once, then `run`/`run_with` stream to any `Write` and `eval`/`eval_with` return a `Vec<u8>` — compile once, run many times. The pipeline modules (`parser`, `vm`, …) are now documented as unstable internals rather than the embedding contract; while the crate is `0.x`, `Program`/`Limits`/`Error` may change between minor versions.
@@ -24,5 +26,6 @@ All notable changes to zonu-lazyk are documented here. The format is based on
 - Embedding: `zonu_lazyk::run(program_src, input, output)` runs a program against any `Read`/`Write` pair.
 - Performance: an ION-style combinator VM with extended combinators (`B`/`C`/`S'`/`B'`/`C'`) introduced by a peephole optimizer, native integer numerals with O(1) church2int extraction, 8-byte packed heap cells, and a Cheney copying collector that bounds memory on unbounded streams. On 20 KB inputs it runs on par with the reference interpreter. Design decisions are recorded in `docs/adr/`.
 
-[Unreleased]: https://github.com/zonuexe/zonu-lazyk/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/zonuexe/zonu-lazyk/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/zonuexe/zonu-lazyk/releases/tag/v0.2.0
 [0.1.0]: https://github.com/zonuexe/zonu-lazyk/releases/tag/v0.1.0
