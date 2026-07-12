@@ -2,9 +2,25 @@
 name = "zonu-lazyk"
 version = "0.1.0"
 edition = "2024"
+rust-version = "1.85"
 description = "A performance-oriented Lazy K interpreter (ION-style combinator VM)"
 license = "GPL-3.0-or-later"
 repository = "https://github.com/zonuexe/zonu-lazyk"
+readme = "README.md"
+authors = ["USAMI Kenta <tadsan@zonu.me>"]
+keywords = ["lazy-k", "lazyk", "combinator", "ski", "interpreter"]
+categories = ["command-line-utilities", "compilers"]
+# Ship code + user docs (README, CONTEXT.md, ADRs) only; agent/CI tooling, the
+# test suite, and the GPL-licensed program fixtures are not part of the crate.
+exclude = [
+    "/.github",
+    "/.claude",
+    "/AGENTS.md",
+    "/CLAUDE.md",
+    "/docs/agents",
+    "/tests",
+    "/benches",
+]
 
 [[bin]]
 name = "zonu-lazyk"

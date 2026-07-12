@@ -1,6 +1,6 @@
 //! Normal-order reduction to WHNF via an explicit spine stack (ADR-0001).
 //!
-//! The spine lives in [`Vm::spine`] so the collector can see and relocate it.
+//! The spine lives in `Vm::spine` so the collector can see and relocate it.
 //! Each call marks a `base` (the caller's spine height) and restores it on
 //! return. A single loop iteration allocates O(1) cells, and the collector runs
 //! only at the top-of-loop safe point (never inside `alloc`), so cached spine

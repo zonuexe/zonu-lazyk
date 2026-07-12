@@ -1,0 +1,41 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+          # Cross-check the Windows target on every PR so it can never first fail
+          # at release time (a Windows binary ships from the same source).
+          targets: x86_64-pc-windows-msvc
+      - name: Format
+        run: cargo fmt --check
+      - name: Clippy
+        run: cargo clippy --all-targets -- -D warnings
+      - name: Test
+        run: cargo test
+      - name: Build
+        run: cargo build
+      - name: Cross-check Windows
+        # `cargo check` type-checks the windows-msvc target without a linker, so
+        # the platform build is validated on every PR, not first at release time.
+        run: cargo check --target x86_64-pc-windows-msvc
+      - name: Docs
+        run: cargo doc --no-deps
+        env:
+          RUSTDOCFLAGS: -D warnings
+      - name: Package (dry run)
+        # Packages exactly as crates.io will, so `exclude`/metadata problems are
+        # caught before a tag makes them irreversible.
+        run: cargo publish --dry-run
