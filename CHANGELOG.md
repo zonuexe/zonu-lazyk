@@ -6,6 +6,8 @@ All notable changes to zonu-lazyk are documented here. The format is based on
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-07-12
+
 ### Added
 
 - **A decode API for embedders** ([ADR-0008](docs/adr/0008-decode-api-for-embedders.md)): `Program::eval_numeral()` reduces the program term to a Church numeral and returns its `u64` value with no 256 cap (so a decoded integer no longer has to be counted from N output bytes); `Program::eval_values(input, &DecodeOptions)` returns the output list as raw Church numerals (`Vec<u64>`) with a configurable/disable-able EOF sentinel; `Program::from_term(Term)` runs an already-built AST without a render-to-string / re-parse round-trip, and `Term`/`Comb` are re-exported at the crate root; `church_numeral(n)` builds a host integer as a native numeral term.
@@ -34,6 +36,7 @@ All notable changes to zonu-lazyk are documented here. The format is based on
 - Embedding: `zonu_lazyk::run(program_src, input, output)` runs a program against any `Read`/`Write` pair.
 - Performance: an ION-style combinator VM with extended combinators (`B`/`C`/`S'`/`B'`/`C'`) introduced by a peephole optimizer, native integer numerals with O(1) church2int extraction, 8-byte packed heap cells, and a Cheney copying collector that bounds memory on unbounded streams. On 20 KB inputs it runs on par with the reference interpreter. Design decisions are recorded in `docs/adr/`.
 
-[Unreleased]: https://github.com/zonuexe/zonu-lazyk/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/zonuexe/zonu-lazyk/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/zonuexe/zonu-lazyk/releases/tag/v0.3.0
 [0.2.0]: https://github.com/zonuexe/zonu-lazyk/releases/tag/v0.2.0
 [0.1.0]: https://github.com/zonuexe/zonu-lazyk/releases/tag/v0.1.0
